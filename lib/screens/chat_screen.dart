@@ -49,7 +49,10 @@ class _ChatScreenState extends State<ChatScreen> {
       final conversations = await ApiServices.fetchConversations();
       setState(() {
         _conversations = conversations.conversations ?? [];
-        if (_conversations.isNotEmpty) {
+        if (_conversations.isEmpty) {
+          // Start a new chat if no conversations exist
+          _createNewChat();
+        } else {
           _activeConversationId = _conversations.first.conversationId;
           _loadChatHistory(_activeConversationId!);
         }
