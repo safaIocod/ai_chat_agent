@@ -20,11 +20,13 @@ class ChatResponse {
 
 class Data {
   final String? message;
-  final String? systemAction;
+  final SystemAction? systemAction;
+
   final bool? requiresHuman;
   final List<dynamic>? toolsUsed;
   final List<dynamic>? retrievedDocuments;
   final ChatAnalysis? chatAnalysis;
+  final int? conversationId;
 
   Data({
     this.message,
@@ -33,11 +35,16 @@ class Data {
     this.toolsUsed,
     this.retrievedDocuments,
     this.chatAnalysis,
+    this.conversationId,
   });
 
   factory Data.fromJson(Map<String, dynamic> json) => Data(
     message: json['message'] as String?,
-    systemAction: json['system_action'] as String?,
+    systemAction:
+        json['system_action'] != null
+            ? SystemAction.fromJson(json['system_action'])
+            : null,
+
     requiresHuman: json['requires_human'] as bool?,
     toolsUsed:
         json['tools_used'] != null
@@ -51,6 +58,10 @@ class Data {
         json['chat_analysis'] != null
             ? ChatAnalysis.fromJson(json['chat_analysis'])
             : null,
+    conversationId:
+        json['conversation_id'] is int
+            ? json['conversation_id'] as int
+            : int.tryParse(json['conversation_id'].toString()),
   );
 
   Map<String, dynamic> toJson() => {
@@ -60,6 +71,30 @@ class Data {
     'tools_used': toolsUsed,
     'retrieved_documents': retrievedDocuments,
     'chat_analysis': chatAnalysis?.toJson(),
+    'conversation_id': conversationId,
+  };
+}
+
+class SystemAction {
+  final String? actionType;
+  final String? email;
+  final String? name;
+  final String? preferredTime;
+
+  SystemAction({this.actionType, this.email, this.name, this.preferredTime});
+
+  factory SystemAction.fromJson(Map<String, dynamic> json) => SystemAction(
+    actionType: json['action_type'] as String?,
+    email: json['email'] as String?,
+    name: json['name'] as String?,
+    preferredTime: json['preferred_time'] as String?,
+  );
+
+  Map<String, dynamic> toJson() => {
+    'action_type': actionType,
+    'email': email,
+    'name': name,
+    'preferred_time': preferredTime,
   };
 }
 

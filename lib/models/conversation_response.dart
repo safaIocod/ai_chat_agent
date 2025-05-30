@@ -57,6 +57,22 @@ class Conversation {
       'last_message': lastMessage?.toJson(),
     };
   }
+
+  Conversation copyWith({
+    String? conversationId,
+    String? context,
+    int? messageCount,
+    DateTime? lastUpdated,
+    Message? lastMessage,
+  }) {
+    return Conversation(
+      conversationId: conversationId ?? this.conversationId,
+      context: context ?? this.context,
+      messageCount: messageCount ?? this.messageCount,
+      lastUpdated: lastUpdated ?? this.lastUpdated,
+      lastMessage: lastMessage ?? this.lastMessage,
+    );
+  }
 }
 
 class Message {

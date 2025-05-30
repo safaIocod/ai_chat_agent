@@ -84,6 +84,23 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   Future<void> _createNewChat() async {
+    // Check if a new chat with conversationId as null already exists
+    final existingNewChatIndex = _conversations.indexWhere(
+      (conversation) => conversation.conversationId == null,
+    );
+
+    if (existingNewChatIndex != -1) {
+      // Do not create a new chat if one already exists
+      setState(() {
+        _activeConversationId = null;
+        _activeChatHistory = ChatHistoryResponse(
+          conversationId: null,
+          chatHistory: [],
+        );
+      });
+      return;
+    }
+
     final newConversation = Conversation(
       conversationId: null,
       context: 'New Chat',
@@ -92,13 +109,16 @@ class _ChatScreenState extends State<ChatScreen> {
 
     setState(() {
       _conversations.insert(0, newConversation);
-      _activeConversationId = newConversation.conversationId;
-      _activeChatHistory = null; // Optionally clear old messages
+      _activeConversationId = null;
+      _activeChatHistory = ChatHistoryResponse(
+        conversationId: null,
+        chatHistory: [],
+      );
     });
   }
 
   void _sendMessage(String text) async {
-    if (text.trim().isEmpty || _isLoading) return;
+    if (text.trim().isEmpty || _isSendingMessage) return;
 
     setState(() {
       _isSendingMessage = true; // Disable the send button
@@ -125,17 +145,43 @@ class _ChatScreenState extends State<ChatScreen> {
         text,
       );
 
-      final adminMessage = ChatMessage(
-        role: 'admin', // or however it's defined
-        content: response.message,
-        timestamp: DateTime.now(),
-      );
+      // Update conversation ID if received from response
+      if (response.data?.conversationId != null) {
+        final newConversationId = response.data!.conversationId.toString();
 
-      setState(() {
-        _activeChatHistory?.chatHistory?.add(adminMessage);
-      });
+        setState(() {
+          // Update conversation ID in activeChatHistory
+          _activeChatHistory?.conversationId = newConversationId;
+          _activeConversationId = newConversationId;
 
-      _scrollToBottom();
+          // Also update it in the conversations list
+          final index = _conversations.indexWhere(
+            (c) => c.conversationId == null,
+          );
+          if (index != -1) {
+            _conversations[index] = _conversations[index].copyWith(
+              conversationId: newConversationId,
+            );
+          }
+        });
+      }
+
+      final adminMessageContent = response.data?.message?.trim();
+      if (adminMessageContent != null && adminMessageContent.isNotEmpty) {
+        final adminMessage = ChatMessage(
+          role: 'admin',
+          content: adminMessageContent,
+          timestamp: DateTime.now(),
+        );
+
+        setState(() {
+          _activeChatHistory?.chatHistory?.add(adminMessage);
+        });
+
+        _scrollToBottom();
+      } else {
+        print('Received empty or null admin message content');
+      }
     } catch (e) {
       print('Error sending message: $e');
     } finally {
@@ -632,14 +678,19 @@ class _ChatScreenState extends State<ChatScreen> {
                                   _isSendingMessage
                                       ? null
                                       : () => _sendMessage(_controller.text),
-                              icon: Icon(
-                                Icons.send,
-                                color:
-                                    _isSendingMessage
-                                        ? Colors.grey
-                                        : Colors.white,
-                                size: 20,
-                              ),
+                              icon:
+                                  _isSendingMessage
+                                      ? CircularProgressIndicator(
+                                        color: Colors.white,
+                                      )
+                                      : Icon(
+                                        Icons.send,
+                                        color:
+                                            _isSendingMessage
+                                                ? Colors.grey
+                                                : Colors.white,
+                                        size: 20,
+                                      ),
                               padding: EdgeInsets.all(12),
                             ),
                           ),

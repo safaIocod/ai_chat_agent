@@ -1,5 +1,5 @@
 class ChatHistoryResponse {
-  final String? conversationId;
+  String? conversationId;
   List<ChatMessage>? chatHistory;
   final bool? chatEnded;
   int? userRating;

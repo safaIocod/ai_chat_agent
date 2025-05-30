@@ -154,7 +154,7 @@ class ApiServices {
     final token = await _getToken();
     if (token == null) throw Exception('No token found. Please log in.');
 
-    final url = '$_baseUrl/conversations/send';
+    final url = '$_baseUrl/conversation/send';
     final response = await http.post(
       Uri.parse(url),
       headers: {
@@ -170,8 +170,8 @@ class ApiServices {
 
     if (response.statusCode == 200) {
       final jsonBody = json.decode(response.body);
-      final data = jsonBody['data'];
-      return ChatResponse.fromJson(data);
+
+      return ChatResponse.fromJson(jsonBody);
     } else {
       throw Exception('Failed to send message');
     }
