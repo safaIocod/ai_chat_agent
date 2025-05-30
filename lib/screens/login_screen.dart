@@ -27,9 +27,18 @@ class _LoginPageState extends State<LoginPage> {
       final success = await ApiServices.login(email, password);
       if (success) {
         if (!mounted) return;
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('User logged in successfully')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            backgroundColor: Color(0xFFDB1F26),
+            content: Text(
+              'User logged in successfully',
+              style: TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+        );
         navigateWithoutAnimation(context, ChatScreen());
       }
     } catch (e) {
