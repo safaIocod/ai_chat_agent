@@ -1,4 +1,5 @@
 import 'package:ai_chat_agent/models/chat_history_response.dart';
+import 'package:ai_chat_agent/models/chat_response.dart';
 import 'package:ai_chat_agent/models/conversation_response.dart';
 import 'package:ai_chat_agent/screens/login_screen.dart';
 import 'package:ai_chat_agent/services/api_services.dart';
@@ -32,8 +33,10 @@ class _ChatScreenState extends State<ChatScreen> {
   final TextEditingController _controller = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   bool _isLoading = false;
+  bool _isSendingMessage = false;
   List<Conversation> _conversations = [];
   ChatHistoryResponse? _activeChatHistory;
+  ChatResponse? _activeChatResponse;
   String? _activeConversationId;
   @override
   void initState() {
@@ -68,6 +71,9 @@ class _ChatScreenState extends State<ChatScreen> {
       setState(() {
         _activeChatHistory = chatHistory;
       });
+
+      // Scroll to the bottom after loading chat history
+      _scrollToBottom();
     } catch (e) {
       // Handle error
     } finally {
@@ -91,34 +97,52 @@ class _ChatScreenState extends State<ChatScreen> {
     });
   }
 
-  void _sendMessage(String text) {
-    // if (text.trim().isEmpty || _activeSession == null) return;
+  void _sendMessage(String text) async {
+    if (text.trim().isEmpty || _isLoading) return;
 
-    // setState(() {
-    //   _activeSession!.messages.add(_Message(text: text, isUser: true));
-    // });
+    setState(() {
+      _isSendingMessage = true; // Disable the send button
+    });
+
+    final userMessage = ChatMessage(
+      role: 'user',
+      content: text,
+      timestamp: DateTime.now(),
+    );
+
+    setState(() {
+      // Show user message immediately
+      _activeChatHistory?.chatHistory?.add(userMessage);
+    });
 
     _controller.clear();
     _scrollToBottom();
-    _simulateApiResponse(text);
-  }
 
-  void _simulateApiResponse(String userMessage) async {
-    await Future.delayed(Duration(seconds: 1));
-    String botResponse = _getBotResponse(userMessage);
-    setState(() {
-      // _activeSession!.messages.add(_Message(text: botResponse, isUser: false));
-    });
-    _scrollToBottom();
-  }
+    try {
+      // Send to backend
+      ChatResponse response = await ApiServices.sendMessage(
+        _activeChatHistory?.conversationId ?? '',
+        text,
+      );
 
-  String _getBotResponse(String message) {
-    if (message.toLowerCase().contains('hello') ||
-        message.toLowerCase().contains('hi'))
-      return "Hello! Thank you for reaching out. Please provide your contact details and describe your issue so we can assist you better.";
-    if (message.toLowerCase().contains('help'))
-      return "I'd be happy to help! Please share more details about what you need assistance with.";
-    return "Thank you for your message. Our team will review this and get back to you soon.";
+      final adminMessage = ChatMessage(
+        role: 'admin', // or however it's defined
+        content: response.message,
+        timestamp: DateTime.now(),
+      );
+
+      setState(() {
+        _activeChatHistory?.chatHistory?.add(adminMessage);
+      });
+
+      _scrollToBottom();
+    } catch (e) {
+      print('Error sending message: $e');
+    } finally {
+      setState(() {
+        _isSendingMessage = false; // Re-enable the send button
+      });
+    }
   }
 
   void _scrollToBottom() {
@@ -281,6 +305,7 @@ class _ChatScreenState extends State<ChatScreen> {
                                 _activeConversationId = chat.conversationId;
                               });
                               _loadChatHistory(chat.conversationId!);
+                              _scrollToBottom();
                             } else {
                               setState(() {
                                 _activeConversationId = null;
@@ -513,6 +538,7 @@ class _ChatScreenState extends State<ChatScreen> {
                             style: TextStyle(
                               fontSize: 16,
                               fontWeight: FontWeight.bold,
+                              color: Colors.black87,
                             ),
                           ),
                           SizedBox(height: 12),
@@ -602,10 +628,16 @@ class _ChatScreenState extends State<ChatScreen> {
                               ),
                             ),
                             child: IconButton(
-                              onPressed: () => _sendMessage(_controller.text),
+                              onPressed:
+                                  _isSendingMessage
+                                      ? null
+                                      : () => _sendMessage(_controller.text),
                               icon: Icon(
                                 Icons.send,
-                                color: Colors.white,
+                                color:
+                                    _isSendingMessage
+                                        ? Colors.grey
+                                        : Colors.white,
                                 size: 20,
                               ),
                               padding: EdgeInsets.all(12),

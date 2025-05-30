@@ -1,13 +1,14 @@
 import 'dart:convert';
 import 'dart:developer';
 import 'package:ai_chat_agent/models/chat_history_response.dart';
+import 'package:ai_chat_agent/models/chat_response.dart';
 import 'package:ai_chat_agent/models/conversation_response.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
 class ApiServices {
   static const String _baseUrl =
-      'http://13.49.46.208/api'; // Replace with your base URL
+      'https://squad1back.docoitest.com/api'; // Replace with your base URL
 
   /// Helper method to get token from SharedPreferences
   static Future<String?> _getToken() async {
@@ -17,7 +18,7 @@ class ApiServices {
 
   /// Login User
   static Future<bool> login(String email, String password) async {
-    final url = Uri.parse('http://13.49.46.208/api/login');
+    final url = Uri.parse('$_baseUrl/login');
     final response = await http.post(
       url,
       headers: {
@@ -143,6 +144,36 @@ class ApiServices {
       return ChatHistoryResponse.fromJson(data);
     } else {
       throw Exception('Failed to fetch chat history');
+    }
+  }
+
+  static Future<ChatResponse> sendMessage(
+    String conversationId,
+    String message,
+  ) async {
+    final token = await _getToken();
+    if (token == null) throw Exception('No token found. Please log in.');
+
+    final url = '$_baseUrl/conversations/send';
+    final response = await http.post(
+      Uri.parse(url),
+      headers: {
+        'Authorization': 'Bearer $token',
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'Accept': 'application/json',
+      },
+      body: {'conversation_id': conversationId, 'message': message},
+    );
+
+    log('Chat message status: ${response.statusCode}');
+    log('Chat message body: ${response.body}');
+
+    if (response.statusCode == 200) {
+      final jsonBody = json.decode(response.body);
+      final data = jsonBody['data'];
+      return ChatResponse.fromJson(data);
+    } else {
+      throw Exception('Failed to send message');
     }
   }
 
