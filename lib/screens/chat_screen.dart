@@ -136,7 +136,7 @@ class _ChatScreenState extends State<ChatScreen> {
   void _startChatRefreshTimer() {
     _chatRefreshTimer?.cancel(); // Cancel previous if any
 
-    _chatRefreshTimer = Timer.periodic(Duration(seconds: 10), (timer) {
+    _chatRefreshTimer = Timer.periodic(Duration(seconds: 20), (timer) {
       // Reload only if still on the same conversation
       if (_lastLoadedConversationId == _activeConversationId) {
         _loadChatHistory(_activeConversationId);
