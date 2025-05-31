@@ -136,12 +136,20 @@ class _ChatScreenState extends State<ChatScreen> {
   void _startChatRefreshTimer() {
     _chatRefreshTimer?.cancel(); // Cancel previous if any
 
-    _chatRefreshTimer = Timer.periodic(Duration(seconds: 20), (timer) {
-      // Reload only if still on the same conversation
-      if (_lastLoadedConversationId == _activeConversationId) {
+    _chatRefreshTimer = Timer.periodic(Duration(seconds: 10), (timer) {
+      if (_activeConversationId == null) {
+        timer.cancel();
+        return;
+      }
+
+      // Load if it's a new conversation or first time
+      if (_lastLoadedConversationId == null ||
+          _lastLoadedConversationId != _activeConversationId) {
         _loadChatHistory(_activeConversationId);
+        _lastLoadedConversationId = _activeConversationId;
       } else {
-        timer.cancel(); // Stop refreshing if user navigates away
+        // Regular refresh
+        _loadChatHistory(_activeConversationId);
       }
     });
   }
@@ -227,6 +235,7 @@ class _ChatScreenState extends State<ChatScreen> {
             );
           }
         });
+        _startChatRefreshTimer();
       }
 
       final adminMessageContent = response.data?.message?.trim();
