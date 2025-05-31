@@ -14,6 +14,7 @@ class _LoginPageState extends State<LoginPage> {
   final TextEditingController passCtrl = TextEditingController();
   final _formKey = GlobalKey<FormState>();
   bool isLoading = false;
+  bool _obscurePassword = true;
 
   void _handleLogin() async {
     if (!_formKey.currentState!.validate()) return;
@@ -42,9 +43,15 @@ class _LoginPageState extends State<LoginPage> {
         navigateWithoutAnimation(context, ChatScreen());
       }
     } catch (e) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(e.toString())));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: Color(0xFFDB1F26),
+          content: Text(
+            e.toString(),
+            style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+          ),
+        ),
+      );
     } finally {
       setState(() => isLoading = false);
     }
@@ -148,15 +155,30 @@ class _LoginPageState extends State<LoginPage> {
                           const SizedBox(height: 16),
                           TextFormField(
                             controller: passCtrl,
-                            obscureText: true,
+                            obscureText: _obscurePassword,
                             validator:
                                 (value) =>
                                     value == null || value.isEmpty
                                         ? "Password is required"
                                         : null,
                             style: const TextStyle(color: Colors.black),
-                            decoration: _inputDecoration("Password"),
+                            decoration: _inputDecoration("Password").copyWith(
+                              suffixIcon: IconButton(
+                                icon: Icon(
+                                  _obscurePassword
+                                      ? Icons.visibility_off
+                                      : Icons.visibility,
+                                  color: Colors.grey,
+                                ),
+                                onPressed: () {
+                                  setState(() {
+                                    _obscurePassword = !_obscurePassword;
+                                  });
+                                },
+                              ),
+                            ),
                           ),
+
                           const SizedBox(height: 24),
                           SizedBox(
                             width: double.infinity,

@@ -2,9 +2,10 @@ import 'package:ai_chat_agent/screens/chat_screen.dart';
 import 'package:ai_chat_agent/screens/login_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-// or import your SignUpPage if that's the login page
+import 'package:timezone/data/latest.dart' as tz;
 
 void main() {
+  tz.initializeTimeZones();
   runApp(ChatWebApp());
 }
 

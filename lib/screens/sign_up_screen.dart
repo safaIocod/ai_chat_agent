@@ -47,9 +47,15 @@ class _SignUpPageState extends State<SignUpPage> {
         navigateWithoutAnimation(context, ChatScreen());
       }
     } catch (e) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(e.toString())));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: Color(0xFFDB1F26),
+          content: Text(
+            e.toString(),
+            style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+          ),
+        ),
+      );
     } finally {
       setState(() => isLoading = false);
     }

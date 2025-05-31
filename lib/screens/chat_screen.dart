@@ -1,3 +1,5 @@
+import 'dart:async';
+import 'package:timezone/timezone.dart' as tz;
 import 'package:ai_chat_agent/models/chat_history_response.dart';
 import 'package:ai_chat_agent/models/chat_response.dart';
 import 'package:ai_chat_agent/models/conversation_response.dart';
@@ -12,23 +14,6 @@ class ChatScreen extends StatefulWidget {
   _ChatScreenState createState() => _ChatScreenState();
 }
 
-class ChatSession {
-  final String id;
-  final String title;
-  final List<_Message> messages;
-
-  ChatSession({required this.id, required this.title, required this.messages});
-}
-
-class _Message {
-  final String text;
-  final bool isUser;
-  final DateTime timestamp;
-
-  _Message({required this.text, required this.isUser, DateTime? timestamp})
-    : timestamp = timestamp ?? DateTime.now();
-}
-
 class _ChatScreenState extends State<ChatScreen> {
   final TextEditingController _controller = TextEditingController();
   final ScrollController _scrollController = ScrollController();
@@ -38,10 +23,22 @@ class _ChatScreenState extends State<ChatScreen> {
   ChatHistoryResponse? _activeChatHistory;
   ChatResponse? _activeChatResponse;
   String? _activeConversationId;
+  Timer? _chatRefreshTimer;
+  String? _lastLoadedConversationId;
+  bool _hasLoadedAtLeastOnce = false;
+
   @override
   void initState() {
     super.initState();
     _loadConversations();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    _scrollController.dispose();
+    _chatRefreshTimer?.cancel(); // Don't forget to cancel
+    super.dispose();
   }
 
   Future<void> _loadConversations() async {
@@ -75,7 +72,10 @@ class _ChatScreenState extends State<ChatScreen> {
       if (success) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text("Thanks for your feedback!"),
+            content: Text(
+              "Thanks for your feedback!",
+              style: TextStyle(color: Colors.white),
+            ),
             backgroundColor: Colors.green,
             behavior: SnackBarBehavior.floating,
           ),
@@ -101,27 +101,45 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   Future<void> _loadChatHistory(String? conversationId) async {
-    setState(() {
-      _isLoading = true;
-    });
+    // Show loader only the first time
+    if (!_hasLoadedAtLeastOnce) {
+      setState(() => _isLoading = true);
+    }
 
     try {
       final chatHistory = await ApiServices.fetchChatHistory(
         conversationId ?? '',
       );
+
+      if (!mounted) return;
+
       setState(() {
         _activeChatHistory = chatHistory;
+        _lastLoadedConversationId = conversationId;
+        _hasLoadedAtLeastOnce = true;
       });
-
-      // Scroll to the bottom after loading chat history
       _scrollToBottom();
+      _startChatRefreshTimer(); // <-- Start periodic reload
     } catch (e) {
+      if (!mounted) return;
       // Handle error
     } finally {
-      setState(() {
-        _isLoading = false;
-      });
+      if (!mounted) return;
+      setState(() => _isLoading = false);
     }
+  }
+
+  void _startChatRefreshTimer() {
+    _chatRefreshTimer?.cancel(); // Cancel previous if any
+
+    _chatRefreshTimer = Timer.periodic(Duration(seconds: 10), (timer) {
+      // Reload only if still on the same conversation
+      if (_lastLoadedConversationId == _activeConversationId) {
+        _loadChatHistory(_activeConversationId);
+      } else {
+        timer.cancel(); // Stop refreshing if user navigates away
+      }
+    });
   }
 
   Future<void> _createNewChat() async {
@@ -164,7 +182,7 @@ class _ChatScreenState extends State<ChatScreen> {
     setState(() {
       _isSendingMessage = true; // Disable the send button
     });
-
+    ;
     final userMessage = ChatMessage(
       role: 'user',
       content: text,
@@ -212,7 +230,7 @@ class _ChatScreenState extends State<ChatScreen> {
         final adminMessage = ChatMessage(
           role: 'admin',
           content: adminMessageContent,
-          timestamp: DateTime.now(),
+          timestamp: DateTime.now().toUtc(),
         );
 
         setState(() {
@@ -263,9 +281,10 @@ class _ChatScreenState extends State<ChatScreen> {
 
   String _formatTime(DateTime? time) {
     if (time == null) return '';
-    final hour = time.hour > 12 ? time.hour - 12 : time.hour;
-    final minute = time.minute.toString().padLeft(2, '0');
-    final period = time.hour >= 12 ? 'PM' : 'AM';
+    final localTime = time.toLocal(); // Convert from UTC to local
+    final hour = localTime.hour > 12 ? localTime.hour - 12 : localTime.hour;
+    final minute = localTime.minute.toString().padLeft(2, '0');
+    final period = localTime.hour >= 12 ? 'PM' : 'AM';
     return '$hour:$minute $period';
   }
 
@@ -379,10 +398,11 @@ class _ChatScreenState extends State<ChatScreen> {
                           title: Text(
                             chat.context?.isNotEmpty == true
                                 ? chat.context!
-                                : 'Untitled Chat',
+                                : '',
                             style: TextStyle(
                               color: Colors.black,
-                              fontSize: 14,
+                              fontSize:
+                                  chat.context?.isNotEmpty == true ? 14 : 16,
                               fontWeight:
                                   isSelected
                                       ? FontWeight.w600
@@ -395,26 +415,39 @@ class _ChatScreenState extends State<ChatScreen> {
                               chat.lastMessage?.content != null
                                   ? Text(
                                     chat.lastMessage!.content!,
-                                    style: const TextStyle(
-                                      color: Colors.black38,
-                                      fontSize: 12,
+                                    style: TextStyle(
+                                      color:
+                                          chat.context?.isNotEmpty == true
+                                              ? Colors.black38
+                                              : Colors.black,
+                                      fontSize:
+                                          chat.context?.isNotEmpty == true
+                                              ? 12
+                                              : 14,
                                     ),
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
                                   )
                                   : null,
                           onTap: () {
+                            setState(() {
+                              _isLoading = true; // Show loading indicator
+                              _activeConversationId = chat.conversationId;
+                            });
+
                             if (chat.conversationId != null) {
-                              setState(() {
-                                _activeConversationId = chat.conversationId;
+                              _hasLoadedAtLeastOnce = false;
+                              _loadChatHistory(chat.conversationId!).then((_) {
+                                // setState(() {
+                                //   _isLoading = false; // Hide loading indicator
+                                // });
+                                _scrollToBottom();
                               });
-                              _loadChatHistory(chat.conversationId!);
-                              _scrollToBottom();
                             } else {
                               setState(() {
                                 _activeConversationId = null;
-                                _activeChatHistory?.chatHistory =
-                                    []; // or whatever your list of messages is called
+                                _activeChatHistory?.chatHistory = [];
+                                _isLoading = false; // Hide loading indicator
                               });
                             }
                           },
@@ -516,7 +549,7 @@ class _ChatScreenState extends State<ChatScreen> {
 
                 Expanded(
                   child:
-                      _isLoading
+                      !_hasLoadedAtLeastOnce && _isLoading
                           ? Center(
                             child: CircularProgressIndicator(
                               color: Color(0xFFDB1F26),
