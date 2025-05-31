@@ -62,6 +62,44 @@ class _ChatScreenState extends State<ChatScreen> {
     }
   }
 
+  Future<void> _submitSatisfactionRating(int rating) async {
+    final conversationId = _activeChatHistory?.conversationId;
+    if (conversationId == null) return;
+
+    try {
+      final success = await ApiServices.updateConversationSatisfaction(
+        conversationId: conversationId,
+        satisfactionRate: rating,
+      );
+
+      if (success) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text("Thanks for your feedback!"),
+            backgroundColor: Colors.green,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text("Failed to submit rating. Please try again."),
+            backgroundColor: Colors.red,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text("Something went wrong: ${e.toString()}"),
+          backgroundColor: Colors.red,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
+  }
+
   Future<void> _loadChatHistory(String? conversationId) async {
     setState(() {
       _isLoading = true;
@@ -195,15 +233,32 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   void _scrollToBottom() {
-    Future.delayed(Duration(milliseconds: 100), () {
-      if (_scrollController.hasClients) {
-        _scrollController.animateTo(
-          _scrollController.position.maxScrollExtent,
-          duration: Duration(milliseconds: 300),
-          curve: Curves.easeOut,
-        );
-      }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _scrollToBottomWithRetry();
     });
+  }
+
+  Future<void> _scrollToBottomWithRetry({int attempts = 0}) async {
+    if (!_scrollController.hasClients || attempts > 5) return;
+
+    final currentMax = _scrollController.position.maxScrollExtent;
+
+    await _scrollController.animateTo(
+      currentMax,
+      duration: Duration(milliseconds: 200),
+      curve: Curves.easeOut,
+    );
+
+    // Wait a bit and check if we need to scroll more
+    await Future.delayed(Duration(milliseconds: 100));
+
+    if (_scrollController.hasClients) {
+      final newMax = _scrollController.position.maxScrollExtent;
+      if (newMax > currentMax) {
+        // Content height changed, try again
+        await _scrollToBottomWithRetry(attempts: attempts + 1);
+      }
+    }
   }
 
   String _formatTime(DateTime? time) {
@@ -469,6 +524,7 @@ class _ChatScreenState extends State<ChatScreen> {
                           )
                           : ListView.builder(
                             controller: _scrollController,
+                            physics: const ClampingScrollPhysics(),
                             padding: const EdgeInsets.all(16),
                             itemCount:
                                 _activeChatHistory?.chatHistory?.length ?? 0,
@@ -615,7 +671,7 @@ class _ChatScreenState extends State<ChatScreen> {
                                   setState(() {
                                     _activeChatHistory?.userRating = index + 1;
                                   });
-                                  // Call API to save rating here if needed
+                                  _submitSatisfactionRating(index + 1);
                                 },
                               );
                             }),

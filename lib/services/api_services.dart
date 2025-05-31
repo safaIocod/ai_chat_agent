@@ -177,6 +177,38 @@ class ApiServices {
     }
   }
 
+  static Future<bool> updateConversationSatisfaction({
+    required String conversationId,
+    required int satisfactionRate,
+  }) async {
+    final token = await _getToken();
+    if (token == null) throw Exception('No token found. Please log in.');
+
+    final url = '$_baseUrl/conversation/update';
+    final response = await http.post(
+      Uri.parse(url),
+      headers: {
+        'Authorization': 'Bearer $token',
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'Accept': 'application/json',
+      },
+      body: {
+        'conversation_id': conversationId,
+        'satisfaction_rate': satisfactionRate.toString(),
+      },
+    );
+
+    log('Update conversation status: ${response.statusCode}');
+    log('Update conversation body: ${response.body}');
+
+    if (response.statusCode == 200) {
+      final jsonBody = json.decode(response.body);
+      return jsonBody['status'] == true;
+    } else {
+      return false;
+    }
+  }
+
   /// Logout
   static Future<void> logout() async {
     final prefs = await SharedPreferences.getInstance();

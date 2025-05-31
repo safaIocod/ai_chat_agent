@@ -33,7 +33,16 @@ class _SignUpPageState extends State<SignUpPage> {
       if (success) {
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("User has registered successfully!")),
+          const SnackBar(
+            backgroundColor: Color(0xFFDB1F26),
+            content: Text(
+              "User has registered successfully!",
+              style: TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
         );
         navigateWithoutAnimation(context, ChatScreen());
       }
