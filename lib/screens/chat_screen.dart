@@ -1,4 +1,6 @@
 import 'dart:async';
+import 'package:flutter/foundation.dart';
+import 'package:flutter/gestures.dart';
 import 'package:timezone/timezone.dart' as tz;
 import 'package:ai_chat_agent/models/chat_history_response.dart';
 import 'package:ai_chat_agent/models/chat_response.dart';
@@ -8,6 +10,8 @@ import 'package:ai_chat_agent/services/api_services.dart';
 import 'package:ai_chat_agent/utils/utils.dart';
 import 'package:ai_chat_agent/widgets/futuristic_textfiled.dart';
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
+import 'dart:html' as html;
 
 class ChatScreen extends StatefulWidget {
   @override
@@ -560,8 +564,85 @@ class _ChatScreenState extends State<ChatScreen> {
                             physics: const ClampingScrollPhysics(),
                             padding: const EdgeInsets.all(16),
                             itemCount:
-                                _activeChatHistory?.chatHistory?.length ?? 0,
+                                (_activeChatHistory?.chatHistory?.length ?? 0) +
+                                (_isSendingMessage ? 1 : 0),
                             itemBuilder: (context, index) {
+                              if (_isSendingMessage &&
+                                  index ==
+                                      (_activeChatHistory
+                                              ?.chatHistory
+                                              ?.length ??
+                                          0)) {
+                                return Padding(
+                                  padding: const EdgeInsets.only(bottom: 16),
+                                  child: Row(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      // Bot Avatar
+                                      Container(
+                                        width: 32,
+                                        height: 32,
+                                        decoration: BoxDecoration(
+                                          color: Colors.white,
+                                          shape: BoxShape.circle,
+                                          border: Border.all(
+                                            color: Colors.grey[300]!,
+                                          ),
+                                        ),
+                                        child: Center(
+                                          child: Container(
+                                            width: 24,
+                                            height: 24,
+                                            decoration: BoxDecoration(
+                                              shape: BoxShape.circle,
+                                              border: Border.all(
+                                                color: Color(0xFFDB1F26),
+                                                width: 2,
+                                              ),
+                                            ),
+                                            child: Icon(
+                                              Icons.support_agent,
+                                              color: Color(0xFFDB1F26),
+                                              size: 12,
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                      SizedBox(width: 8),
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                            Container(
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                    horizontal: 16,
+                                                    vertical: 12,
+                                                  ),
+                                              decoration: BoxDecoration(
+                                                color: Colors.grey[200],
+                                                borderRadius:
+                                                    BorderRadius.circular(20),
+                                              ),
+                                              child: Row(
+                                                mainAxisSize: MainAxisSize.min,
+                                                children: [
+                                                  JumpingDots(
+                                                    color: Color(0xFFDB1F26),
+                                                    size: 6,
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                );
+                              }
                               final msg =
                                   _activeChatHistory!.chatHistory?[index];
                               return Padding(
@@ -622,15 +703,20 @@ class _ChatScreenState extends State<ChatScreen> {
                                               borderRadius:
                                                   BorderRadius.circular(20),
                                             ),
-                                            child: Text(
-                                              msg?.content ?? '',
-                                              style: TextStyle(
-                                                color:
-                                                    msg?.role == 'user'
-                                                        ? Colors.white
-                                                        : Colors.black87,
-                                                fontSize: 16,
-                                                height: 1.4,
+                                            child: RichText(
+                                              text: TextSpan(
+                                                style: TextStyle(
+                                                  color:
+                                                      msg?.role == 'user'
+                                                          ? Colors.white
+                                                          : Colors.black87,
+                                                  fontSize: 16,
+                                                  height: 1.4,
+                                                ),
+                                                children: _parseTextWithLinks(
+                                                  msg?.content ?? "",
+                                                  msg?.role == 'user',
+                                                ),
                                               ),
                                             ),
                                           ),
@@ -770,19 +856,14 @@ class _ChatScreenState extends State<ChatScreen> {
                                   _isSendingMessage
                                       ? null
                                       : () => _sendMessage(_controller.text),
-                              icon:
-                                  _isSendingMessage
-                                      ? CircularProgressIndicator(
-                                        color: Colors.white,
-                                      )
-                                      : Icon(
-                                        Icons.send,
-                                        color:
-                                            _isSendingMessage
-                                                ? Colors.grey
-                                                : Colors.white,
-                                        size: 20,
-                                      ),
+                              icon: Icon(
+                                Icons.send,
+                                color:
+                                    _isSendingMessage
+                                        ? Colors.grey
+                                        : Colors.white,
+                                size: 20,
+                              ),
                               padding: EdgeInsets.all(12),
                             ),
                           ),
@@ -795,5 +876,97 @@ class _ChatScreenState extends State<ChatScreen> {
         ],
       ),
     );
+  }
+
+  List<TextSpan> _parseTextWithLinks(String text, bool isUserMessage) {
+    // Improved URL regex that won't match abbreviations like "e.g"
+    final urlRegex = RegExp(
+      r'(?:(?:https?|ftp):\/\/)(?:[\w-]+\.)+[a-z]{2,}(?:\/[\w\-\.?=%@&/+]*)*|' // Full URLs
+      r'\bwww\.[\w-]+\.(?:[a-z]{2,})(?:\/[\w\-\.?=%@&/+]*)*\b', // www URLs
+      caseSensitive: false,
+    );
+
+    final matches = urlRegex.allMatches(text);
+    final List<TextSpan> spans = [];
+    int currentIndex = 0;
+
+    for (final match in matches) {
+      // Add text before the URL
+      if (match.start > currentIndex) {
+        spans.add(
+          TextSpan(
+            text: text.substring(currentIndex, match.start),
+            style: TextStyle(
+              color: isUserMessage ? Colors.white : Colors.black87,
+            ),
+          ),
+        );
+      }
+
+      // Add the URL
+      final url = match.group(0)!;
+      spans.add(
+        TextSpan(
+          text: url,
+          style: TextStyle(
+            color: isUserMessage ? Colors.white : Colors.blue,
+            decoration: TextDecoration.underline,
+          ),
+          recognizer:
+              TapGestureRecognizer()
+                ..onTap =
+                    () => _launchUrl(
+                      url.startsWith(RegExp(r'https?:\/\/|ftp:\/\/'))
+                          ? url
+                          : 'https://$url',
+                    ),
+        ),
+      );
+
+      currentIndex = match.end;
+    }
+
+    // Add remaining text after last URL
+    if (currentIndex < text.length) {
+      spans.add(
+        TextSpan(
+          text: text.substring(currentIndex),
+          style: TextStyle(
+            color: isUserMessage ? Colors.white : Colors.black87,
+          ),
+        ),
+      );
+    }
+
+    return spans.isEmpty
+        ? [
+          TextSpan(
+            text: text,
+            style: TextStyle(
+              color: isUserMessage ? Colors.white : Colors.black87,
+            ),
+          ),
+        ]
+        : spans;
+  }
+
+  Future<void> _launchUrl(String url) async {
+    try {
+      if (kIsWeb) {
+        html.window.open(url, '_blank');
+      } else {
+        if (await canLaunch(url)) {
+          await launch(url);
+        } else {
+          throw 'Could not launch $url';
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Could not launch $url')));
+      }
+    }
   }
 }
